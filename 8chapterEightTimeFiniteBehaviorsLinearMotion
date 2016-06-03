@@ -1,0 +1,603 @@
+# Chapter Eight - Time, Part 1: Finite Behaviors and Linear Motion
+
+(jm8: Figures [ex. Figure 8.1] are not included. Go to corehtml5games.com/snailbait)
+
+#### Topics in This Chapter
+* 8.1 Implement an Initial Jump Algorithm
+* 8.2 Shift Responsibility for Jumping to the Runner
+* 8.3 Implement the Jump Behavior
+* 8.4 Time Animations and Stopwatches
+* 8.5 Refine the Jump Behavior
+* 8.6 Implement Linear Motion
+* 8.7 Pause Behaviors
+* 8.8 Conclusion
+* 8.9 Exercises
+
+
+The last chapter discussed how to encapsulate actions - such as running, falling, pacing, or sparkling - that sprites undertake in JavaScript objects known as behaviors. At runtime, you can configure a sprite's array of behaviors however you desire. Among its many benefits, that flexibility encourages exploration of game aspects that might otherwise lie dormant.
+
+This chapter continues to discuss sprite behaviors, with a few twists. To start, this is the first of two consecutive chapters devoted to a single sprite behavior: the runner's jump behavior. By the end of the next chapter, Snail Bait will ultimately arrive at a natural jump sequence, which involves nonlinear motion.
+
+First, though, in this chapter we implement the simpler case of linear motion during the jump.
+
+Second, jumps last for a specific amount of time, unlike the behaviors discussed in the preceding chapter. Because of that simple difference, Snail Bait must track time as jumps progress. That requirement means we need something that lets us time jumps and other finite behaviors, so in this chapter we also implement a JavaScript stopwatch and use it to time the runner' ascent and descent as she jumps.
+
+Third, we must be able to pause and resume finite behaviors that time themselves, so at the end of this chapter we implement that functionality.
+
+In this chapter you will learn how to do the following:
+
+* Encapsulate jumping in a sprite behavior
+* Implement a JavaScript stopwatch
+* Use stopwatches to time finite animations
+* Implement linear motion
+* Pause and resume a finite behavior such as jumping
+
+
+### 8.1 - Implement an Initial Jump Algorithm
+
+We begin with a simple algorithm for jumping that we refine throughout this chapter and the next. Our first attempt at jumping is listed in Example 8.1.
+
+
+// Example 8.1 - Keyboard handling for jumps
+```javascript
+  window.addEventListener(
+    'keydown',
+    function(e){
+      var key = e.keyCode;
+
+      if(key === 74){   // 'j'
+        if(snailBait.runner.track === 3){   // At the top; nowhere to go
+          return;
+        }
+
+        snailBait.runner.track++;
+
+        snailBait.runner.top = snailBait.calculatePlatformTop(snailBait.runner.track) - snailBait.RUNNER_CELLS_HEIGHT;
+      }
+    }
+  );
+```
+
+When the player presses the j key, the preceding event handler immediately puts the runner's feet on the track above her if she is not already on the top track. Figure 8.2 illustrates instantaneous jumping.
+
+The jumping implementation shown in Figure 8.2 has two serious drawbacks. First, the runner moves instantly from one level to another, which is far from the desired effect. Second, the jumping implementation is at the wrong level of abstraction. A window event handler has no business directly manipulating the runner's properties; instead, the runner herself should be responsible for jumping.
+
+
+### 8.2 - Shift Responsibility for Jumping to the Runner
+
+Example 8.2 shows a modified implementation of the window's *keydown* event handler. It's simpler than the implementation in Example 8.1, and it shifts responsibility for jumping from the event handler to the runner.
+
+
+// Example 8.2 - The window's key handler, delegating to the runner
+```javascript
+  window.addEventListener(
+    'keydown',
+    function(e){
+      var key = e.keyCode;
+      ...
+      if(key === 74){   // 'j'
+        snailBait.runner.jump();
+      }
+    }
+  );
+```
+
+Next we implement the runner's jump() method. We begin by modifying Snail Bait's initializeSprites() method, which Snail Bait calls at the beginning of the game. The updated version of initializeSprites() invokes a helper method named equipRunner(), as shown in Example 8.3.
+
+
+// Example 8.3 - Equipping the runner at the start of the game
+```javascript
+  SnailBait.prototype = {
+    ...
+    initializeSprites: function(){
+      ...
+      this.equipRunner();
+    },
+
+    equipRunner: function(){
+      ...
+      this.equipRunnerForJumping();      // Equip the runner for falling later
+    }
+    ...
+  };
+```
+
+The equipRunner() method invokes a method named equipRunnerForJumping(). In Chapter 12, we also equip the runner for falling with an equipRunnerForFalling() method, but for now we focus on jumping.
+
+An initial implementation of the equipRunnerForJumping() method is listed in Example 8.4.
+
+
+// Example 8.4 - Equipping the runner: The runner's jump() method
+```javascript
+  SnailBait.prototype = {
+    ...
+    equipRunnerForJumping: function(){
+      var INITIAL_TRACK = 1;
+
+      this.runner.jumping = false;
+      this.runner.track = INITIAL_TRACK;
+
+      this.runner.jump = function(){
+        if(this.jumping){     // 'this' is the runner
+          return;
+        }
+
+        this.jumping = true;
+      };
+
+      this.runner.stopJumping = function(){
+        this.jumping = false;
+      };
+    },
+    ...
+  };
+```
+
+The equipRunnerForJumping() method adds two methods to the runner JavaScript object: jump() and stopJumping().
+
+If the runner is not already jumping, runner.jump() merely sets the value of the runner's 'jumping' property to 'true', so the method doesn't really implement jumping at all, because, as it does for all sprite behaviors, Snail Bait implements the act of jumping in a separate behavior object. The runner's 'jumping' property acts as a *trigger* for the runner's jump behavior, as you'll see in the next section.
+
+The runner's stopJumping() method simply sets the runner's 'jumping' property to 'false', which disengages the jump behavior.
+
+When it creates the runner, Snail Bait adds the jump behavior to the runner's array of behaviors, as shown in Example 8.5.
+
+Every animation frame, Snail Bait invokes the execute() method of the runner's jump behavior. That behavior does nothing until the player presses the j key (or taps the screen on mobile devices) to make the runner jump. When that happens, as you saw in Example 8.4, the runner's jump() method sets the runner's 'jumping' property to 'true', which acts as a trigger that engages the jump behavior.
+
+
+// Example 8.5 - Running and jumping
+```javascript
+  var SnailBait = function(){
+    ...
+    this.jumpBehavior = {
+      execute: function(sprite, now, fps, context, lastAnimationFrameTime){
+        // Implementing jumping here
+      },
+      ...
+    };
+
+    this.runner = new Sprite('runner',
+                              new SpriteSheetArtist(this.spritesheet, this.runnerCellsRight),
+                              [this.runBehavior, this.jumpBehavior, ...]);
+
+  };
+```
+
+Now that the infrastructure is in place for initiating a jump, we can concentrate solely on the jump behavior.
+
+
+### 8.3 - Implement the Jump Behavior
+
+Our first implementation of the runner's jump behavior, listed in Example 8.6, mimics the functionality of our original attempt at jumping.
+
+
+// Example 8.6 - An instantaneous jump behavior
+```javascript
+  var SnailBait = function(){
+    ...
+    this.jumpBehavior = {
+      ...
+      execute: function(sprite, now, fps, context, lastAnimationFrameTime){
+        if(!sprite.jumping || sprite.track === 3){
+          return;
+        }
+
+        sprite.track++;
+        sprite.top = snailBait.calculatePlatformTop(sprite.track) - snailBait.RUNNER_CELLS_HEIGHT;
+        sprite.jumping = false;
+      }
+    };
+    ...
+  };
+```
+
+Compared with many of Snail Bait's other sprite behaviors, jumping is a relatively infrequent occurrence. Most of the time the runner's jump behavior does nothing because the behavior's trigger - the runner's 'jumping' property - is false. When the runner's jump() method sets that property to 'true', the behavior's trigger is tripped and the jump behavior takes action in the next animation frame, provided the runner has a track above her.
+
+With the code for jumping encapsulated in a behavior, we're ready to refine that behavior to implement more realistic jumping, but first we must implement stopwatches so we can time jumps.
+
+
+#### NOTE: Invoking the jump behavior
+
+Recall that every animation, Snail Bait iterates over all behaviors associated with each visible sprite, invoking each behavior's execute() method. The runner sprite is always visible, which means Snail Bait invokes the jump behavior in every animation frame.
+
+
+#### NOTE: Behavior triggers
+
+Behaviors that last for a finite amount of time typically have some sort of trigger - such as the runner's 'jumping' property - that causes the behavior to take action. When the behavior concludes, it resets the trigger and lies dormant until the next time the game trips the trigger.
+
+
+### 8.4 - Time Animations with Stopwatches
+
+All the motion we've implemented so far in Snail Bait has been constant. For example, all the game's sprites, except for the runner, scroll continuously in the horizontal direction, and buttons and snails constantly pace back and forth on their platforms. Coins, sapphires, and rubies bob up and down without ever stopping to take a break.
+
+Jumping, however, is not constant; it has a definite start and end. To implement jumping, therefore, we need a way to monitor how much time has elapsed since a jump began. What we need is a stopwatch.
+
+Example 8.7 shows the implementation of a 'Stopwatch' constructor function.
+
+Stopwatches keep track of whether they are running, the time they started running, and the time that elapsed since they started running. Stopwatches also keep track of whether they are paused, the start time of the pause, and the total time the stopwatch has been paused.
+
+
+// Example 8.7 - The Stopwatch constructor
+```javascript
+  var Stopwatch = function(){
+    this.startTime = 0;
+    this.running = false;
+    this.elapsed = undefined;
+
+    this.paused = false;
+    this.startPause = 0;
+    this.totalPausedTime = 0;
+  };
+```
+
+The stopwatch's methods reside in the 'Stopwatch' object's prototype, listed in Example 8.8.
+
+
+// Example 8.8 - Stopwatch methods
+```javascript
+  Stopwatch.prototype = {
+    start: function(){
+      var now = +new Date();
+
+      this.startTime = now;
+      this.running = true;
+      this.totalPausedTime = 0;
+      this.startPause = 0;
+    },
+
+    stop: function(){
+      var now = +new Date();
+
+      if(this.paused){
+        this.unpause();
+      }
+
+      this.elapsed = now - this.startTime - this.totalPausedTime;
+      this.running = false;
+    },
+
+    pause: function(){
+      var now = +new Date();
+
+      this.startPause = now;
+      this.paused = true;
+    },
+
+    unpause: function(){
+      var now = +new Date();
+
+      if(!this.paused){
+        return;
+      }
+
+      this.totalPausedTime += now - this.startPause;
+      this.startPause = 0;
+      this.paused = false;
+    },
+
+    getElapsedTime: function(){
+      var now = +new Date();
+
+      if(this.running){
+        return now - this.startTime - this.totalPausedTime;
+      }
+
+      else{
+        return this.elapsed;
+      }
+    },
+
+    isPaused: function(){
+      return this.paused;
+    },
+
+    isRunning: function(){
+      return this.running;
+    },
+
+    reset: function(){
+      var now = +new Date();
+
+      this.elapsed = 0;
+      this.startTime = now;
+      this.running = false;
+      this.totalPausedTime = 0;
+      this.startPause = 0;
+    }
+  };
+```
+
+You can start, stop, pause, unpause, and reset stopwatches. You can also get their elapsed time, and you can determine whether they are running or paused.
+
+In Section 4.5 you saw how to resume a paused game exactly where it left off by accounting for the amount of time the game was paused. Like the game itself, paused stopwatches must resume exactly where they leave off, so they also account for the amount of time they've been paused.
+
+The stopwatch implementation, though simple, is important because it lets us implement behaviors that last for finite amounts of time.
+
+#### NOTE: +new Date(). The current time according to stopwatches
+
+Stopwatch methods access the current time with the construct +new Date(), which coerces a 'Date' object into a number. The important thing, however, is not the construct, but the fact that - for the time being- the *concept of the current time is internal to stopwatches*. When we discuss time systems in Chapter 10, we modify the 'Stopwatch' object so the current time is no longer defined inside 'Stopwatch' methods, but is passed to those methods by the game itself.
+
+
+#### NOTE: JavaScript timestamps
+
+Most computer languages provide a convenient way to get a timestamp; for example, C++'s time() method. Typically, such timestamp methods return the number of seconds since the Epoch(00:00 at January 1, 1970). JavaScript, on the other hand, returns the number of milliseconds since the Epoch.
+
+It's important to realize that a timestamp's actual value is irrelevant, as long as it represents the current time (however it's defined) and as long as the value consistently represents the same thing. Games are only interested in the flow of time, so elapsed times are important, not absolute time values.
+
+
+### 8.5 - Refine the Jump Behavior
+
+Now that we have stopwatches, let's use them to time the jump behavior. First, we modify the equipRunnerForJumping() method from Example 8.4 as shown in Example 8.9.
+
+// Example 8.9 - Revised equipRunnerForJumping() method
+```javascript
+  SnailBait.prototype = {
+    ...
+    equipRunnerForJumping: function(){
+      var INITIAL_TRACK = 1;
+
+      this.runner.JUMP_HEIGHT = 120;    // pixels
+      this.runner.JUMP_DURATION = 1000;     // milliseconds
+
+      this.runner.jumping = false;
+      this.runner.track = INITIAL_TRACK;
+
+      this.runner.ascendTimer = new Stopwatch();
+      this.runner.descendTimer = new Stopwatch();
+
+      this.runner.jump = function(){
+        if(this.jumping){   // 'this' is the runner
+          return;
+        }
+
+        this.jumping = true;
+
+        this.runAnimationRate = 0;  // Freeze the runner animation while jumping
+        this.verticalLaunchPosition = this.top;
+        this.ascendTime.start();
+      };
+
+      this.runner.stopJumping = function(){
+        this.jumping = false;
+      };
+    },
+    ...
+  };
+```
+
+The revised implementation of equipRunnerForJumping() creates two stopwatches: runner.ascendTimer for the jump's ascent and runner.descendTimer for its descent.
+
+When the jump begins, the jump() method starts the runner's ascend stopwatch, sets the runner's run animation rate to zero (to freeze her when she's in the air) and records the runner's vertical position, to return her to that position when the jump completes.
+
+The runner properties set in Example 8.9 are summarized in Table 8.1.
+
+
+// Example 8.1 - The runner's jump-related properties
+
+* JUMP_DURATION         A constant representing the jump's duration in milliseconds: 1000.
+
+* JUMP_HEIGHT           A constant representing the jump's height in pixels: 120. At the apex of the her jump, the top of the
+                        runner's head is 20 pixels above the next track.
+
+* ascendTimer           A stopwatch that times the runner's ascent during a jump.
+
+* descendTimer          A stopwatch that times the runner's descent during a jump.
+
+* jumpApex              The highest point for the top of the runner's head during the runner's jump. During the runner's
+                        descent, the jump behavior uses the apex to determine how far to drop the runner for each animation
+                        frame.
+
+* jumping               A flag that's 'true' while the runner is jumping. This is the trigger for the jump behavior.
+
+* verticalLaunchPosition  The top of the runner's head when a jump starts. The runner returns to that position at the end
+                          of a complete jump.
+
+
+Next, in Example 8.10, we modify the jump behavior originally implemented in Example 8.6.
+
+
+// Example 8.10 - The jump behavior, revisited
+```javascript
+  var SnailBait = function(){
+    ...
+    this.jumpBehavior = function(){
+      ...
+      execute: function(sprite, now, context, fps, lastAnimationFrameTime){
+        if(!sprite.jumping){    // Not currently jumping, nothing to do
+          return;
+        }
+
+        if(this.isAscending(sprite)){                   // Ascending
+          if(!this.isDoneAscending(sprite)){            // Not done ascending
+            this.ascend(sprite);                        // Ascend
+          }
+          else{
+            this.finishAscent(sprite);                  // Finish ascending
+          }
+        }
+
+        else if(this.isDescending(sprite)){             // Descending
+          if(!this.isDoneDescending(sprite)){           // Not done descending
+            this.descend(sprite);                       // Descend
+          }
+          else{
+            this.finishDescent(sprite);                 // Finish descending
+          }
+        }
+      }
+    };
+    ...
+  };
+```
+
+
+The jump behavior in Example 8.10 is the implementation of a high-level abstraction that leaves jumping details to other methods, such as ascend() and isDescending(). All that remains is to fill in those details by using the runner's ascend and descend stopwatches to implement the following eight methods:
+
+* ascend()
+
+* isAscending()
+
+* isDoneAscending()
+
+* finishAscent()
+
+* descend()
+
+* isDescending()
+
+* isDoneDescending()
+
+* finishDescent()
+
+
+### 8.6 - Implement Linear Motion
+
+To begin, we implement jumping with linear motion, meaning the runner ascends and descends at a constant rate of speed, as depicted in Figure 8.3.
+
+Linear motion results in a jumping motion that's unnatural because gravity should constantly decelerate the runner when she's ascending and accelerate her as she descends. In Chapter 9, we modify time so the jump behavior results in nonlinear motion, as depicted in Figure 8.1, but for now we'll stick to the simpler case of linear motion.
+
+
+#### 8.6.1 - Ascending
+
+The jump behavior's methods dealing with ascending are shown in Example 8.11.
+
+
+// Example 8.11 - Ascending
+```javascript
+  var SnailBait = function(){
+    ...
+    this.jumpBehavior = {
+      isAscending: function(sprite){
+        return sprite.ascendTimer.isRunning();
+      },
+
+      ascend: function(sprite, now){
+        var elapsed = sprite.ascendTimer.getElapsedTime(now),
+            deltaY = elapsed / (sprite.JUMP_DURATION/2) * sprite.JUMP_HEIGHT;
+
+        sprite.top = sprite.verticalLaunchPosition - deltaY;    // Minus moves runner up the canvas
+      },
+
+      isDoneAscending: function(sprite, now){
+        return sprite.ascendTimer.getElapsedTime(now) > sprite.JUMP_DURATION/2;
+      },
+
+      finishAscent: function(sprite, now){
+        sprite.jumpApex = sprite.top;
+        sprite.ascendTimer.stop(now);
+        sprite.descendTimer.start(now);
+      },
+      ...
+    };
+    ...
+  };
+```
+
+The methods in Example 8.11 are summarized in Table 8.2.
+
+
+// Table 8.2 - The jump behavior's ascend methods
+
+Method                Description
+
+isAscending()         Returns 'true' if the runner's ascend stopwatch is running.
+
+ascend()              Moves the runner up in accordance with the elapsed time of the last animation frame and the jump's
+                      duration and height.
+
+isDoneAscending()     Returns 'true' if the elapsed time on the runner's ascend stopwatch is greater than half the jump's
+                      duration
+
+finishAscent()        Finishes the ascent by stopping the runner's ascend stopwatch and starting its descend stopwatch. The jump
+                      behavior calls this method when the runner is at the highest point in the jump, so finishAscent() stores the runner's vertical position in the runner's 'jumpApex' property to position the runner during her descent.
+
+
+Recall that the runner's jump method, listed in Example 8.9 starts the runner's ascend stopwatch. Subsequently, that running stopwatch causes the jump behavior's isAscending() method to temporarily return 'true'. Also recall that until the runner is done ascending - meaning the jump is halfway over - the runner's jump behavior repeatedly calls the ascend() method, as you can see from Example 8.10.
+
+The ascend() method calculates the number of pixels to move the runner vertically for each animation frame by dividing the stopwatch's elapsed time (milliseconds) by one-half of the jump's duration (milliseconds) and multiplying that value by the height of the jump (pixels). The milliseconds cancel out, yielding pixels as the unit of measure for the 'deltaY' value.
+
+When the runner finishes her ascent, the jump behavior's finishAscent() method records the sprite's position at the jump apex, stops the ascend stopwatch, and starts the descend stopwatch.
+
+
+#### 8.6.2 - Descending
+
+The jump behavior methods associated with descending are shown in Example 8.12.
+
+
+// Example 8.12 - Descending
+```javascript
+  var SnailBait = function(){
+    ...
+    this.jumpBehavior = {
+      ...
+      isDescending: function(sprite){
+        return sprite.descendTimer.isRunning();
+      },
+
+      descend: function(sprite, now){
+        var elapsed = sprite.descendTimer.getElapsedTime(now),
+            deltaY = elapsed / (sprite.JUMP_DURATION/2) * sprite.JUMP_HEIGHT;
+
+        sprite.top = sprite.jumpApex + deltaY;  // Moving down
+      },
+
+      isDoneDescending: function(sprite, now){
+        return sprite.descendTimer.getElapsedTime(now) > sprite.JUMP_DURATION/2;
+      },
+
+      finishDescent: function(sprite, now){
+        sprite.stopJumping();
+
+        if(snailBait.platformUnderneath(sprite)){
+          sprite.top = sprite.verticalLaunchPosition;
+        }
+
+        else{
+          sprite.fall(snailBait.GRAVITY_FORCE *
+          (sprite.descendTimer.getElapsedTime(now)/1000) *
+          snailBait.PIXELS_PER_METER);
+        }
+      },
+      ...
+    };
+    ...
+  };
+```
+
+The methods in Example 8.12 are summarized in Table 8.3.
+
+There's a lot of symmetry between the ascend methods in Table 8.2 and the descend methods in Table 8.3. Both ascend() and descend() calculate the number of pixels to move the runner in the vertical direction for the current frame in exactly the same manner. The descend() method, however, adds that value to the jump's apex, whereas ascend() subtracts if from the vertical launch position (recall that the Canvas Y axis increases from top to bottom).
+
+When the jump's descent is finished, finishDescent() places the runner at the same vertical position at which she began the jump and restarts her run animation.
+
+
+// Table 8.3 - The jump behavior's descend methods
+
+Method                   Description
+
+isDescending()          Returns 'true' if the runner's descend stopwatch is running
+
+descend()               Moves the runner down in accordance with the elapsed time of the last animation frame
+                        and the jump's duration and height.
+
+isDoneDescending()      Returns 'true' if the elapsed time on the runner's descend stopwatch is greater
+                        than half the jump's duration
+
+finishDescent()         Stops the descent, and the jump, by stopping the runner's descend stopwatch
+                        and setting the runner's 'jumping' flag to 'false', respectively. After descending,
+                        the runner might not be at exactly the same height as she was when the jump began, so
+                        finishDescent() sets the runner's vertical position to what it was before the jump.
+                        Finally, finishDescent() sets the runner's animation rate to its normal value,
+                        causing the runner to start running.
+
+
+### 8.7 - Pause Behaviors
+
+Behaviors that time their activities with stopwatches must pause and resume those stopwatches when the game in which they reside pauses and resumes; otherwise, behaviors can get out of sync with the rest of the game. For example, the preceding implementation of the jump behavior does not pause its stopwatches when Snail Bait pauses during a jump, causing jumps to move ahead in time while the game is paused. When the game resumes, therefore, the jump behavior jumps ahead in time.
+
+To pause and resume 'sprite' behaviors and therefore keep behaviors in sync with Snail Bait, we add a togglePausedStateOfAllBehaviors() method to Snail Bait. The game invokes that method from its togglePaused() method, as shown in Example 8.13.
+
+
+// Example 8.13 - The toggledPaused() method, revised
+```javascript
+
+```

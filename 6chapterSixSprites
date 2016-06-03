@@ -1,0 +1,961 @@
+# Chapter Six - Sprites
+
+(jm8: Figures [ex. Figure 6.1] are not included. Go to corehtml5games.com/snailbait)
+
+#### Topics in This Chapter
+* 6.1 Sprite Objects
+* 6.2 Incorporate Sprites into a Game Loop
+* 6.3 Implement Sprite Artists
+* 6.4 Create and Initialize a Game's Sprites
+* 6.5 Define sprites with Metadata
+* 6.6 Scroll Sprites
+* 6.7 Conclusion
+* 6.8 Exercises
+
+
+Like other art forms, such as film, theatre, and novels, games have a cast of characters, each of which plays a particular role. For example, Snail Bait has the runner (the game's central character), coins, rubies, sapphires, bees, bats, buttons, and a snail, all of which are shown in Figure 6.1. See Chapter 1 for a discussion of those characters and their roles in the game.
+
+Each character in Snail Bait is a sprite, which are animated characters you endow with behaviors; for example, the runner can run, jump, fall, and collide with other sprites in the game, whereas rubies and sapphires sparkle, bob up and down, and disappear when they collide with the runner.
+
+Because sprites are one of the most fundamental aspects of any game, and because games typically have many of them, it makes sense to encapsulate their functionality in reusable JS objects.
+
+#### NOTE: The term sprite
+
+One of the implementers of the Texas Instruments 9918A video-display processor was the first to use the term sprite for animated characters. (In standard English, the word - derived from the Latin spiritus - means elf or fairy). Sprites have been implemented in both software and hardware; the Commodore Amiga in 1985 supported up to eight hardware sprites.
+
+
+#### NOTE: The first animated character
+
+Before Mickey Mouse, and even before Gertie the Dinosaur, there was Little Nemo by Winsor McCay who was a pioneer among animators. Little Nemo made his appearance in the silent short film titled *Winsor McCay, the Famous Cartoonist of the N.Y. Herald and His Moving Comics*. You can watch the silent film on YouTube at http://bit.ly/1gzsWWr.
+
+
+#### NOTE: Game engines
+
+In this chapter you will see how to implement reusable JS objects known as sprites that you can customize, mostly through the sprite's artist and its behaviors, in any fashion you desire.
+
+Reusable code is important for rapid development of sophisticated games; in fact, many games are implemented with an underlying game engine, which encapsulates many other aspects of game development in addition to sprites. One of the most popular game engines is the Unreal Engine, which has been used to create hundreds of games on different platforms. You can read more about the Unreal Engine on Wikipedia at http://en.wikipedia.org/wiki/Unreal_Engine.
+
+
+### 6.1 - Sprite Objects
+
+You can create and manipulate sprites in any game, not just Snail Bait, so the sprite implementation resides in a file of its own in the game's js directory. Snail Bait includes that file in its HTML, shown in Example 6.1.
+
+The snailbait.js file depends on js/sprites.js, so Snail Bait includes the former first.
+
+
+// Example 6.1 - Including the sprite JavaScript
+```html
+  <!DOCTYPE html>
+  <html>
+    ...
+    <body>
+      ...
+      <script src="js/sprites.js"></script>
+      <script src="snailbait.js"></script>
+    </body>
+  </html>
+```
+
+
+To create a sprite in JavaScript, you invoke the Sprite constructor, as shown in Example 6.2.
+
+
+// Example 6.2 - Initially creating the runner sprite
+```javascript
+  var SnailBait = function(){
+    ...
+    this.runner = new Sprite(
+      'runner',       // type of sprite
+      new SpriteSheetArtist(this.spritesheet, this.runnerCellsRight)    // sprite artist
+    );
+    ...
+  };
+```
+
+Snail Bait initially creates the runner sprite without any behaviors, so the preceding instantiation of the runner specifies the minimum amount of information required to create a sprite: its type and its artist.
+
+A sprite's type is a string and its artist is an object with a draw() method that draws the sprite. The runner's artist is a sprite sheet artist, which copies images from a sprite sheet - a single image containing all of the game's images - into the game's canvas. Section 6.3, "Implementing Sprite Artists", takes a closer look at implementing sprite artists.
+
+Example 6.3 shows the runner's instantiation in the final version of the game, complete with behaviors.
+
+
+// Example 6.3 - Creating the runner sprite with behaviors
+```javascript
+  var SnailBait = function(){
+    ...
+    this.runner = new Sprite(
+      'runner',      // sprite type
+      new SpriteSheetArtist(this.spritesheet, this.runnerCellsRight),   // sprite artist
+      [this.runBehavior,  // An array of sprite behaviors
+      this.jumpBehavior,
+      this.fallBehavior,
+      this.collideBehavior,
+      this.runnerExplodeBehavior]
+    );
+    ...
+  };
+```
+
+Like artists, behaviors are also objects, but instead of a draw() method, behaviors implement an execute() method that manipulates the sprite so it exhibits some sort of behavior. Section 6.1.3, "Sprite Methods", shows how sprites invoke their behaviors' execute() method.
+
+You've seen how to create sprites. Next, we look at their properties.
+
+
+#### NOTE: The benefits of artists and behaviors
+
+Sprites don't do much on their own. Much of what constitutes a sprite - such as what it looks like and how it behaves - is implemented by separate objects, known as artists and behaviors, respectively. That separation of concerns results in a simple implementation for sprites themselves and the ability to plug in different artists and behaviors at runtime.
+
+#### NOTE: Including separate JavaScript files
+
+Throughout this book we add JavaScript files to Snail Bait for other functionality besides sprites, such as the game's time system. Ultimately, however, Snail Bait includes only one JavaScript file that contains all of the game's minified JavaScript. See Chapter 19 for details.
+
+
+#### 6.1.1 - Sprite Properties
+
+Sprites are JavaScript objects with properties and methods. Those properties are listed in Table 6.1.
+
+
+// Table 6.1 - Sprite Properties
+
+Property             Description
+
+Sprite.artist        An object whose draw() method draws the artist's associated sprite.
+Sprite.behaviors     An array of objects, each of which has an execute() method. That method
+                     manipulates the behavior's associated sprite to implement a behavior over time.
+Sprite.left          The X coordinate of the sprite's upper-left corner.
+Sprite.top           The Y coordinate of the sprite's upper-left corner.
+Sprite.width         The sprite's width in pixels.
+Sprite.height        The sprite's height in pixels.
+Sprite.hOffset       The sprite's horizontal offset. See Section 6.6 for more information
+Sprite.opacity       A number that determines whether a sprite is opaque, transparent, or somewhere
+                     in between. Valid values are between 0.0 (invisible) and 1.0 (opaque).
+Sprite.type          A string representing the sprite's type, such as bat, bee, or runner.
+Sprite.velocityX     The sprite's horizontal velocity, specified in pixels/second
+Sprite.velocityY     The sprite's vertical velocity, specified in pixels/second.
+Sprite.visible       The sprite's visibility. If the value is false, Snail Bait does not update
+                     or draw the sprite.
+
+
+Sprites maintain their location and size, velocity, and visibility. They also have a type to distinguish one sprite from another, and an opacity, so that sprites can be partially transparent.
+
+Like the background, Snail Bait's sprites scroll horizontally. And also like the background, sprites keep track of a horizontal offset (hOffset) that determines where they appear in the game's canvas. See Chapter 3 for more information about scrolling the background and Section 6.6 "Scroll Sprites" to see how Snail Bait uses the hOffset property.
+
+
+#### NOTE: Sprites have only horizontal offsets
+
+The sprites implemented in this book have a horizontal offset stored in their hOffset property, but not a vertical offset because Snail Bait scrolls sprites only in the horizontal direction. It would be a simple matter, however, to add support for vertical scrolling with an analogous vOffset property.
+
+#### NOTE: A sprite's horizontal position never changes
+
+Recall from Chapter 3 that Snail Bait scrolls the background by continuously translating the coordinate system for the game's canvas. Snail Bait always draws the background at the same coordinates; it's the translation of the coordinate system that gives the background its apparent horizontal motion.
+
+Snail Bait moves sprites in the horizontal direction in exactly the same manner as the background. A sprite's horizontal position, stored in the sprite's 'left' property, never changes; instead, the game changes the sprite's horizontal offset, stored in the sprite's 'hOffset' property. When Snail Bait draws sprites, it translates the coordinate system left by the sprite's horizontal offset (hOffset), draws the sprite at its never-changing horizontal location (left), and translates the coordinate system right, back to where it was in the first place. See Section 6.2 "Incorporate Sprites into a Game Loop" for more details.
+
+
+#### 6.1.2 - The Sprite Constructor
+
+Example 6.4 lists the Sprite constructor, which sets a sprite's properties to initial values.
+
+// Example 6.4 - The Sprite constructor
+```javascript
+  var Sprite = function(type, artist, behaviors){
+    var DEFAULT_WIDTH = 10,
+        DEFAULT_HEIGHT = 10,
+        DEFAULT_OPACITY = 1.0;
+
+    this.artist     = artist;
+    this.type       = type;
+    this.behaviors  = behaviors || [];
+
+    this.hOffset    = 0;    // horizontal offset
+    this.left       = 0;
+    this.top        = 0;
+    this.width      = DEFAULT_WIDTH;
+    this.height     = DEFAULT_HEIGHT;
+    this.velocityX  = 0;
+    this.velocityY  = 0;
+    this.opacity    = DEFAULT_OPACITY;
+    this.visible    = true;
+  }
+```
+
+The Sprite constructor takes three arguments: a type, an artist, and an array of behaviors. If you don't specify behaviors, the constructor creates an empty array. If you don't specify a type or an artist, they are undefined.
+
+
+#### 6.1.3 - Sprite Methods
+
+Sprites initially have only two methods, listed in Table 6.2.
+
+
+// Table 6.2 - Snail Bait sprite methods
+
+Method                    Description
+draw(context)             Calls the draw() method of the sprite's artist if the sprite
+                          is visible and has an artist
+update(now, fps,          Invokes the execute() method for each of the sprite's behaviors
+      context,
+      lastAnimationFrameTime)
+
+
+Every animation frame, Snail Bait invokes each visible sprite's update() method followed by a call to its draw() method; see Section 6.2 "Incorporate Sprites into a Game Loop" for details. The update() method delegates to the sprite's behaviors to update the sprite's properties, and the draw() method subsequently delegates to the sprite's artist to draw the sprite.
+
+When we implement collision detection in Chapter 11, we add a couple of methods and properties to the Sprite object, but for now the draw() and update() methods listed in Example 6.5 will suffice.
+
+
+// Example 6.5 - Sprite method implementations
+```javascript
+  Sprite.prototype = {    // An object containing Sprite methods
+
+    draw: function(context){
+      context.save();
+      context.globalAlpha = this.opacity;
+
+      if(this.visible && this.artist){
+        this.artist.draw(this, context);
+      }
+
+      // Restore globalAlpha and any other changes the artist may have made to the
+      // context in the artist's draw() method
+
+      context.restore();
+    },
+
+    update: function(now, fps, context, lastAnimationFrameTime){
+      for(var i=0; i < this.behaviors.length, i++){
+        this.behaviors[i].execute(this, now, fps, context, lastAnimationFrameTime);
+      }
+    }
+  }
+```
+
+As you can see from Examples 6.4 and 6.5, sprites are not complicated. Much of a sprite's complexity is encapsulated in its artist and behaviors.
+
+If a sprite is visible and has an artist, the sprite's draw() method invokes the artist's draw() method. The calls to the context's save() and restore() methods ensure that the context.globalAlpha property's value, along with any other changes to the context properties made by the artist's draw() method, are restored after the sprite is drawn. See Chapter 3 for more information on saving and restoring the context.
+
+A sprite's update() method iterates over the sprite's behaviors, invoking each behavior's execute() method in turn. Those execute() methods typically update their associated sprite by modifying the sprite's properties or invoking its methods.
+
+Because sprites are decoupled from their artists and behaviors, you can change artists and behaviors at runtime. In fact, it's possible, and often highly desirable, to implement general behaviors that can be used with multiple sprites, as you will see in Chapter 7.
+
+Now that you've seen how sprites are implemented, you're set to see how Snail Bait incorporates them into its game loop.
+
+
+#### NOTE: Implementing sprites
+
+This book illustrates one way to implement sprites, but there are many ways to do it. Depending on the game you are implementing, you may wish to use the book's implementation or perhaps some variation thereof. Or you may want to implement your own sprites from scratch, perhaps using some of the ideas from this chapter and the next.
+
+
+### 6.2 - Incorporate Sprites into a Game Loop
+
+Snail Bait maintains an array of sprite objects, as you can see in Example 6.6. The game populates that array when it creates sprites at the beginning of the game, as you will see in Section 6.4, "Create and Initialize a Game's Sprites".
+
+
+// Example 6.6 - Snail Bait's sprites array
+```javascript
+  var SnailBait = function(){
+    ...
+    this.sprites = [];
+    ...
+  };
+```
+
+Snail Bait's draw() method, as discussed in Chapter 4, invoked separate methods drawRunner() and drawPlatforms(), for drawing the runner and platforms. Now that the runner and platforms are sprites, we remove drawRunner() and drawPlatforms() from the game and modify the draw() method, as shown in Example 6.7.
+
+
+// Example 6.7 - Updating and drawing sprites every animation frame
+```javascript
+  SnailBait.prototype = {
+    ...
+    draw: function(now){    // Called by animate() every animation frame
+      ...
+      this.updateSprites(now);
+      this.drawSprites();
+    }
+    ...
+  };
+```
+
+Every animation frame, Snail Bait's animate() method invokes the preceding draw() method, which updates and draws the game's sprites. The updateSprites() method is listed in Example 6.8.
+
+// Example 6.8 - Updating sprites
+```javascript
+  SnailBait.prototype = {
+    ...
+    updateSprites: function(now){
+      var sprite;
+
+      for(var i=0; i < this.sprites.length; i++){
+        sprite = this.sprites[i];
+
+        if(sprite.visible && this.isSpriteInView(sprite)){
+          sprite.update(now, this.fps, this.context, this.lastAnimationFrameTime);
+        }
+      }
+    },
+    ...
+  };
+```
+
+
+Snail Bait's updateSprites() method iterates over the game's sprites, and for every visible sprite that's currently in view, updateSprites() invokes the sprite's update() method, which we discussed in Section 6.1.3, "Sprite Methods". The isSpriteInView() method returns 'true' when the sprite lies within the visible canvas, as shown in Example 6.9.
+
+
+// Example 6.9 - Determining whether a sprite is in view
+```javascript
+  SnailBait.prototype = {
+    ...
+    isSpriteInView: function(sprite){
+      return sprite.left + sprite.width > sprite.hOffset &&
+             sprite.left < sprite.hOffset + this.canvas.width;
+    };
+  }
+```
+
+The preceding method takes into account the sprite's horizontal offset, stored in the hOffset property. We discuss that offset and how Snail Bait sets it in Section 6.6, "Scroll Sprites".
+
+Example 6.10 shows the implementation of Snail Bait's drawSprites() method.
+
+
+// Example 6.10 - Drawing sprites
+```javascript
+  Snailbait.prototype = {
+    ...
+    drawSprites: function(){
+      var sprite;
+
+      for(var i=0; i < this.sprites.length; i++){
+        sprite = this.sprites[i];
+
+        if(sprite.visible && this.isSpriteInView(sprite)){
+          this.context.translate(-sprite.hOffset,0);
+          sprite.draw(this.context);
+          this.context.translate(sprite.hOffset,0);
+        }
+      }
+    };
+    ...
+  };
+```
+
+
+Like updateSprites(), drawSprites() also iterates over Snail Bait's sprites. For every sprite that's visible and in view, the drawSprites() method *translates the coordinate system to the left by sprite.hOffset pixels*, invokes the sprite's draw() method, and *translates the coordinate system back to where it was initially*. That temporary translation of the coordinate system gives sprites their apparent horizontal motion.
+
+Now that you've seen how to implement sprites and incorporate them into Snail Bait, let's look at sprite artists.
+
+
+#### NOTE: A sprite's update() method receives important information
+
+Snail Bait's animate() method invokes the game's draw() method, which in turn iterates over all visible sprites, invoking each sprite's update() method. That update() method in turn iterates over all of the sprite's behaviors, invoking each behavior's execute() method.
+
+Valuable information, along with the graphics context, is passed from the animate() method to the execute() method of a sprite's behaviors, namely:
+
+* The current time
+* The current frame rate
+* The time at which the game drew the last animation frame
+
+Behaviors use that information to determine how to manipulate their sprite at a particular point in time.
+
+
+#### NOTE: Updating sprites based on the current time
+
+Snail Bait enforces a subtle separation of concerns when it updates and draws its sprites: The game's draw() method, listed in Example 6.7, passes the current time to the game's updateSprites() method, whereas it does not pass the current time to the game's drawSprites() method.
+
+That difference exists because sprite artists should simply draw their sprites. Manipulating sprites, which is typically dependent on the current time, is the sole purview of sprite behaviors.
+
+
+#### BEST PRACTICE: Update all sprites in one pass and draw them in another
+
+Every animation frame, Snail Bait iterates over its sprites twice, once to update them and a second time to draw them. You might wonder why Snail Bait doesn't just iterate once, updating and drawing each sprite in turn, which would admittedly result in ever-so-slightly better performance.
+
+The reason Snail Bait update sprites in one pass and draws them in another is that updating a sprite may affect another sprite's position or the way it looks; for example, when Snail Bait's snail shoots a bomb, the snail's shoot behavior makes the bomb visible. If the bomb were updated and drawn before the snail, the bomb would make a belated appearance.
+
+In your own games you should also update and draw your sprites in two passes to avoid timing issues related to sprite interdependencies.
+
+
+
+### 6.3 - Implement Sprite Artists
+
+Recall that sprites do not draw themselves; instead, they delegate that responsibility to another object, known as the sprite's artist.
+
+Also, recall the chain of events that result in a sprite artist drawing its sprite. Every animation frame, Snail Bait's animate() method invokes the game's draw() method, which iterates over the game's sprites, invoking every visible sprite's draw() method. The sprite's draw() method invokes the draw() method of the artist.
+
+Generally, there are three types of sprite artist:
+
+* Stroke and fill artist:
+  Draws graphics primitives, such as lines, arcs, and curves.
+
+* Image artist:
+  Draws an image with the 2D context's drawImage() method.
+
+* Sprite sheet artist:
+  Draws an image from a sprite sheet, also with drawImage().
+
+Regardless of an artist's type, all sprite artists must fulfill only one requirement: Implement a draw() method that takes a sprite and a Canvas 2D context. Example 6.11 shows the implementation of the stroke and fill artist that draws Snail Bait's platform sprites.
+
+
+// Example 6.11 - Drawing platform sprites
+```javascript
+  var SnailBait = function(){
+    ...
+    this.platformArtist = {
+      draw: function(sprite, context){
+        var PLATFORM_STROKE_WIDTH = 1.0,
+            PLATFORM_STROKE_STYLE = 'black',
+            top;
+
+        top = snailBait.calculatePlatformTop(sprite.track);
+
+        context.lineWidth = PLATFORM_STROKE_WIDTH;
+        context.strokeStyle = PLATFORM_STROKE_STYLE;
+        context.fillStyle = sprite.fillStyle;
+
+        context.strokeRect(sprite.left, top, sprite.width, sprite.height);
+        context.fillRect(sprite.left, top, sprite.width, sprite.height);
+      }
+    };
+    ...
+  };
+```
+
+The platform artist's draw() method is similar to the standalone draw() function discussed in Chapter 3. Like that function, the platform artist draws its platform as a filled rectangle.
+
+
+#### 6.3.2 - Image Artists
+
+Image artists draw an image; for example, Example 6.12 shows how the runner's artist *could* draw the runner's image (but it does not).
+
+
+// Example 6.12 - Drawing the runner with an image artist
+```javascript
+  var SnailBait = function(){
+    ...
+    // Snail Bait does NOT use the following artist. It is listed merely to illustrate
+    // image artists, which Snail Bait does not use. Instead, Snail Bait uses sprite sheet
+    // artists to draw its sprites
+
+    this.runnerArtist = {
+      draw: function(sprite, context){
+        snailBait.context.drawImage(snailBait.runnerImage, sprite.left, sprite.top);
+      }
+    };
+    ...
+  };
+```
+
+Snail Bait however does not implement the runner's artist as shown in Example 6.12; instead, the game implements the runner's artist as a sprite sheet artist.
+
+
+#### 6.3.3 - Sprite Sheet Artists
+
+One of the most effective ways to ensure that your game loads quickly is to reduce the number of HTTP requests you make to a minimum. Most games use lots of images, and your startup time will suffer significantly if you make separate HTTP requests for each of them. For that reason, HTML5 game developers typically create a single large image containing all of the game's images. That single image is known as a sprite sheet. Figure 6.2 shows Snail Bait's sprite sheet.
+
+To draw sprites from a sprite sheet, you copy rectangles from the sprite sheet onto a canvas. You can easily do that with the Canvas 2D context's drawImage() method, as shown in Example 6.13, which lists the implementation of the SpriteSheetArtist object.
+
+
+// Example 6.13 - Sprite sheet artists
+```javascript
+  SpriteSheetArtist = function(spritesheet, cells){
+    this.cells = cells;
+    this.spritesheet = spritesheet;
+    this.cellIndex = 0;
+  };
+
+  SpriteSheetArtist.prototype = {
+    draw: function(sprite, context){
+      var cell = this.cells[this.cellIndex];
+
+      context.drawImage(this.spritesheet, cell.left,    cell.top,
+                                          cell.width,   cell.height,
+                                          sprite.left,  sprite.top,
+                                          cell.width,   cell.height);
+    },
+
+    advance: function(){
+      if(this.cellIndex === this.cells.length-1){
+        this.cellIndex = 0;
+      }
+      else{
+        this.cellIndex++;
+      }
+    }
+  };
+```
+
+The 2D graphics context's drawImage() method used in the preceding listing is the same method used in Example 6.12; however, the preceding listing uses the nine-argument version of the method to draw from a cell in a sprite sheet to the sprite's location in the canvas.
+
+Sprites in sprite sheets are often aligned in strips, as is the case for Snail Bait's sprite sheet, as you can see from Figure 6.2. Typically, each strip contains multiple images of a single sprite in different poses. Sprite sheet artists can advance through those images, drawing each in turn, thereby animating the sprite.
+
+You instantiate sprite sheet artists with a reference to a sprite sheet and an array of bounding boxes, called cells. Those cells represent rectangular areas within the sprite sheet. Each cell encloses a single sprite image.
+
+Sprite sheet artists also maintain an index into their cells. The sprite sheet artists's draw() method uses that index to access the current cell and then uses the nine-argument version of the Canvas 2D context's drawImage() to draw the contents of that cell into a canvas at the sprite's location.
+
+The sprite sheet artist's advance() method advances the cell index to the next cell, wrapping around to the beginning when the index points to the last cell. A subsequent call to the sprite sheet artist's draw() method draws the corresponding image. By repeatedly advancing the index and drawing, sprite sheet artists can draw a set of images sequentially from a sprite sheet.
+
+Sprite sheet artists are easy to implement. They are also easy to use; you just instantiate the artist with a sprite sheet and cells, and subsequently invoke the advance() and draw() methods as desired.
+
+Now that we've seen how sprite sheet artists draw cells from a sprite sheet, let's see how Snail Bait defines those cells in the first place.
+
+
+#### NOTE: Sprite sheets on mobile devices
+
+Memory on mobile devices is much more limited than available memory on the desktop, so large images, such as a game's sprite sheet, can fail to load on mobile devices.
+
+iOS sets specific limits on image size. Apple discusses those limits at http://bit.ly/17h7baT under the heading "Known iOS Resource Limits". Here's an online calculator that tells you whether your image will load on different versions of iOS: http://bit.ly/PJqEXy.
+
+Android does not have any fixed limits on image size; however, if you exceed the amount of available memory when loading an image, you will get the dreaded *java.lang.OutofMemoryError: bitmapsize exceeds VM budget* error. The Android Developers Guide at http://developer.android.com/training/displaying-bitmaps/index.html shows you how to deal with that scenario.
+
+
+#### 6.3.4 - Define Sprite Sheet Cells
+
+Example 6.14 shows cell definitions within Snail Bait's sprite sheet for the game's bats, bees, and snail.
+
+
+// Example 6.14 - Some sprite sheet cell definitions
+```javascript
+  var SnailBait = function(){
+    ...
+    this.BAT_CELLS_HEIGHT = 14;   // Bat cell width varies; not constant
+    this.BEE_CELLS_HEIGHT = 50;
+    this.BEE_CELLS_WIDTH = 50;
+    ...
+    this.SNAIL_CELLS_HEIGHT = 34;
+    this.SNAIL_CELLS_WIDTH = 64;
+    ...
+    this.batCells = [
+      {left: 3,   top: 0, width: 36, height: this.BAT_CELLS_HEIGHT},
+      {left: 41,  top: 0, width: 46, height: this.BAT_CELLS_HEIGHT},
+      {left: 93,  top: 0, width: 36, height: this.BAT_CELLS_HEIGHT},
+      {left: 132, top: 0, width: 46, height: this.BAT_CELLS_HEIGHT}
+    ];
+
+    this.beeCells = [
+      {left: 5,   top: 234, width: this.BEE_CELLS_WIDTH, height: this.BEE_CELLS_HEIGHT},
+      {left: 75,  top: 234, width: this.BEE_CELLS_WIDTH, height: this.BEE_CELLS_HEIGHT},
+      {left: 145, top: 0,   width: this.BEE_CELLS_WIDTH, height: this.BEE_CELLS_HEIGHT}
+    ];
+
+    this.snailCells = [
+      {left: 142, top: 466, width: this.SNAIL_CELLS_WIDTH, height: this.SNAIL_CELLS_HEIGHT},
+      {left: 75,  top: 466, width: this.SNAIL_CELLS_WIDTH, height: this.SNAIL_CELLS_HEIGHT},
+      {left: 2,   top: 466, width: this.SNAIL_CELLS_WIDTH, height: this.SNAIL_CELLS_HEIGHT}
+    ];
+    ...
+  }
+```
+
+Determining cell bounding boxes is a tedious task, so it's worth the time to implement a tool that can do it for you, such as the one shown in Figure 6.3.
+
+The application shown in Figure 6.3 displays an image and tracks mouse movement within that image. As you move the mouse, the application draws guidelines and displays the current mouse location in a readout in (jm8: "the") upper-left corner of the application. The tool makes it easy to determine bounding boxes for each image in the sprite sheet. You can access the tool at corehtml5games.com/spritesheet-tool.
+
+Now that you have a good idea how to implement sprites and their artists, it's time to look at how Snail Bait creates and initializes its sprites.
+
+
+#### NOTE: The game developer's tool chest
+
+A game developer's work is pretty much all fun and games. But occasionally, game developers must perform tedious tasks such as determining sprite sheet cells. Most game developers, therefore, spend a fair amount of time implementing tools, such as the one shown in Figure 6.3, to assist them with those tasks. Creating tools can be fun too, so make sure you heed the following note.
+
+
+#### NOTE: Every developer tool has a sweet spot
+
+The sprite sheet inspector shown in Figure 6.3 is a simple tool that leaves a considerable amount of work to the developer, who must manually record the coordinates of every corner of every image in the sprite sheet. A more industrial strength sprite sheet inspector could automatically detect images in the sprite sheet and record the coordinates of their bounding boxes, but that would be a lot more work to implement.
+
+Developer tools that you implement are a trade-off between the amount of time you invest in them versus their ultimate influence on your productivity. It's easy to get carried away developing tools, so it's a good idea to keep that trade-off in mind as you develop them.
+
+
+### 6.4 - Create and Initialize a Game's Sprites
+
+As we discussed in Section 6.2, "Incorporate Sprites into a Game Loop", Snail Bait maintains a single array named *sprites* in which it stores references to all its sprites. For convenience, Snail Bait also maintains separate arrays for different types of sprites, as you can see in Example 6.15.
+
+
+// Example 6.15 - Defining sprite arrays in the game constructor
+```javascript
+  var SnailBait = function(){   // constructor
+    ...
+    this.bats       = [];
+    this.bees       = [];
+    this.buttons    = [];
+    this.coins      = [];
+    this.platforms  = [];
+    this.rubies     = [];
+    this.sapphires  = [];
+    this.snails     = [];
+
+    this.sprites    = [];   // Contains references to all the sprites in the preceding arrays
+    ...
+  };
+```
+
+The individual arrays for bees, bats, and so on are not strictly necessary. In fact, they are redundant - but they facilitate performance. For example, when the game checks to see if the runner has landed on a platform, it's more efficient to iterate over the 'platforms' array than to iterate over the 'sprites' array looking for platforms.
+
+When the game starts, Snail Bait invokes its createSprites() method, which is listed in Example 6.16.
+
+
+// Example 6.16 - Creating sprites
+```javascript
+  SnailBait.prototype = {
+    ...
+    createSprites: function(){
+      this.createPlatformSprites();
+
+      this.createBatSprites();
+      this.createBeeSprites();
+      this.createButtonSprites();
+      this.createCoinSprites();
+      this.createRunnerSprites();
+      this.createRubySprites();
+      this.createSapphireSprites();
+      this.createSnailSprites();
+
+      this.initializeSprites();
+
+      // All sprites are also stored in a single array
+      this.addSpritesToSpriteArray();
+    },
+    ...
+  };
+```
+
+The createSprites() method creates the game's sprites with helper methods such as createBatSprites() and createSnailSprites(). Three of those methods are listed in Example 6.17.
+
+
+// Example 6.17 - Some of Snail Bait's sprite creation methods
+```javascript
+  SnailBait.prototype = {
+    ...
+    // In the interest of brevity, not all Snail Bait's sprite creation methods are listed here.
+
+    createBatSprites: function(){
+      var bat,
+          BAT_FLAP_DURATION = 200;
+          BAT_FLAP_INTERVAL = 50;
+
+      for(var i=0; i<this.batData.length; i++){
+        bat = new Sprite('bat',
+                          new SpriteSheetArtist(this.spritesheet, this.batCells),
+                          [new CycleBehavior(BAT_FLAP_DURATION,
+                                             BAT_FLAP_INTERVAL]);
+
+        bat.width = this.batCells[i].width;
+        bat.height = this.BAT_CELLS_HEIGHT;
+
+        bat.collisionMargin = {
+          left: 6, top: 11, right: 4, bottom: 8
+        };
+
+        this.bats.push(bat);
+      }
+    },
+
+    createPlatformSprites: function(){
+      var sprite, pd,          // Sprite, Platform Data
+          PULSE_DURATION = 800,
+          PULSE_OPACITY_THRESHOLD = 0.1;
+
+      for(var i=0; i<this.platformData.length; i++){
+        pd = this.platformData[i];
+
+        sprite = new Sprite('platform', this.platformArtist);
+
+        sprite.left = pd.left;
+        sprite.width = pd.width;
+        sprite.height = pd.height;
+        sprite.fillStyle = pd.fillStyle;
+        sprite.opacity = pd.opacity;
+        sprite.track = pd.track;
+        sprite.button = pd.button;
+        sprite.pulsate = pd.pulsate;
+
+        sprite.top = this.calculatePlatformTop(pd.track);
+
+        if(sprite.pulsate){
+          sprite.behaviors =
+            [new PulseBehavior(PULSE_DURATION, PULSE_OPACITY_THRESHOLD)];
+        }
+
+        this.platforms.push(sprite);
+      }
+    },
+
+    createRunnerSprite: function(){
+      var RUNNER_LEFT = 50,
+          RUNNER_HEIGHT = 53,
+          STARTING_RUNNER_TRACK = 1,
+          STARTING_RUN_ANIMATION_RATE = this.RUN_ANIMATION_RATE;
+
+      this.runner = new Sprite('runner',
+                                new SpriteSheetArtist(this.spritesheet, this.runnerCellsRight),
+                                [this.runBehavior,
+                                 this.jumpBehavior,
+                                 this.collideBehavior,
+                                 this.runnerExplodeBehavior,
+                                 this.fallBehavior]);
+
+      this.runner.runAnimationRate = STARTING_RUN_ANIMATION_RATE;
+
+      this.runner.track = STARTING_RUNNER_TRACK;
+
+      this.runner.left = RUNNER_LEFT;
+      this.runner.width = this.RUNNER_CELLS_WIDTH;
+      this.runner.height = this.RUNNER_CELLS_HEIGHT;
+
+      this.putSpriteOnTrack(this.runner, STARTING_RUNNER_TRACK);
+
+      this.runner.collisionMargin = {
+        left: 15,
+        top: 10,
+        right: 10,
+        bottom: 10,
+      };
+
+      this.sprites.push(this.runner);
+    },
+    ...
+  }
+```
+
+The preceding listing shows sprite creation methods for bats, platforms, and the runner, leaving out methods that create coins, bees, buttons, rubies, sapphires, snails, and snail bombs in the interest of brevity. The methods that are not listed in the preceding listing are similar to createBatSprites(), which creates several sprites of a certain type, outfits those sprites with a sprite sheet artist and behaviors, and initializes the sprites's properties.
+
+The methods that create the runner and the platforms are included in the preceding listing because they are special cases. Platforms do not have sprite sheet artists like the rest of Snail Bait's sprites; the platform artist, as you saw in Example 6.11, draws a filled rectangle instead of an image. The runner, on the other hand, is unique because it's one of a kind, so the createRunnerSprite() method adds the runner directly to the game's 'sprites' array.
+
+The most interesting aspect of Snail Bait's sprite creation methods, however, is that, except for the runner, they all create sprites from arrays of sprite metadata. Let's look at that metadata next.
+
+
+### 6.5 - Define Sprites with Metadata
+
+Snail Bait draws all its sprites, except for platforms, from a single sprite sheet. As you saw in Section 6.3.4, 'Define Sprite Sheet Cells', Snail Bait defines data objects that specify the location and size of the game's images in the sprite sheet.
+
+Besides data objects that specify where a sprite's images reside in the game's sprite sheet, Snail Bait also defines objects for other sprite properties, for example, their location or whether they pulsate or not. Example 6.18 lists some of that metadata.
+
+
+// Example 6.18 - Sprite metadata
+```javascript
+  var SnailBait = function(){
+    ...
+    // Sprite Data.............................................
+
+    this.batData = [
+      {left: 85,
+        top: this.TRACK_2_BASELINE - 1.5*this.BAT_CELLS_HEIGHT},
+
+      {left: 620,
+        top: this.TRACK_3_BASELINE},
+
+      {left: 904,
+        top: this.TRACK_3_BASELINE - 3*this.BAT_CELLS_HEIGHT},
+
+      {left: 1150,
+        top: this.TRACK_2_BASELINE - 3*this.BAT_CELLS_HEIGHT},
+
+      {left: 1720,
+        top: this.TRACK_2_BASELINE - 2*this.BAT_CELLS_HEIGHT},
+
+      {left: 1960,
+        top: this.TRACK_3_BASELINE - this.BAT_CELLS_HEIGHT},
+
+      {left: 2200,
+        top: this.TRACK_3_BASELINE - this.BAT_CELLS_HEIGHT},
+
+      {left: 2380,
+        top: this.TRACK_3_BASELINE - 2*this.BAT_CELLS_HEIGHT}
+    ];
+
+    this.beeData = [
+      {left: 200,
+        top: this.TRACK_1_BASELINE - this.BEE_CELLS_HEIGHT*1.5},
+
+      {left: 350,
+        top: this.TRACK_2_BASELINE - this.BEE_CELLS_HEIGHT*1.5},
+
+      {left: 550,
+        top: this.TRACK_1_BASELINE - this.BEE_CELLS_HEIGHT},
+
+      {left: 750,
+        top: this.TRACK_1_BASELINE - this.BEE_CELLS_HEIGHT*1.5},
+
+      {left: 924,
+        top: this.TRACK_2_BASELINE - this.BEE_CELLS_HEIGHT*1.75},
+
+      {left: 1500, top: 225},
+      {left: 1600, top: 115},
+      {left: 2225, top: 125},
+      {left: 2295, top: 275},
+      {left: 2450, top: 275}
+    ];
+
+    this.buttonData = [
+      {platformIndex: 7},
+      {platformIndex: 12}
+    ];
+    ...
+  }
+```
+
+Creating sprites from metadata is a good idea because of the following:
+
+* Sprite metadata is located in one place, instead of spread throughout the code
+* Methods that create sprites are simpler when they are decoupled from the metadata
+* Metadata can come from anywhere
+
+Because sprite metadata is located in one place in the code, it's easy to find and modify. Also, because metadata is defined apart from methods that create sprites, those methods are simpler, and therefore easier to understand and modify. Finally, although the metadata for Snail Bait is embedded directly in the code, sprite metadata can come from anywhere - including, for example, a level editor that might create metadata at runtime. Metadata is easier to modify, and it's more flexible than specifying sprite data directly within methods that create sprites.
+
+Recall from Example 6.16 that after creating the game's sprites, Snail Bait's createSprites() method invokes two methods: initializeSprites() and addSpritesToSpriteArray(). Example 6.19 shows the implementation of the initializeSprites() method and its positionSprites() helper method.
+
+
+// Example 6.19 - Initializing Snail Bait's sprites
+```javascript
+  SnailBait.prototype = {
+    ...
+    initializeSprites: function(){
+      this.positionSprites(this.bats,       this.beeData);
+      this.positionSprites(this.bees,       this.beeData);
+      this.positionSprites(this.buttons,    this.buttonData);
+      this.positionSprites(this.coins,      this.coinData);
+      this.positionSprites(this.rubies,     this.rubyData);
+      this.positionSprites(this.sapphires,  this.sapphireData);
+      this.positionSprites(this.snails,     this.snailData);
+
+      this.setSpriteValues();
+
+      this.armSnails();
+      this.equipRunner();
+
+    },
+
+    positionSprites: function(sprites, spriteData){
+      var sprite;
+
+      for(var i=0; i<sprites.length; i++){
+        sprite = sprites[i];
+
+        if(spriteData[i].platformIndex)}{
+          this.putSpriteOnPlatform(sprite, this.platforms[spriteData[i].platformIndex]);
+        }
+        else {
+          sprite.top = spriteData[i].top;
+          sprite.left = spriteData[i].left
+        }
+      }
+    },
+    ...
+  };
+```
+
+
+The initializeSprites() method invokes positionSprites() for each of the game's sprite arrays. That method, in turn, positions sprites at locations specified by the sprite's metadata. Some sprites, such as buttons and snails, reside on platforms, so Snail Bait's putSpriteOnPlatform() method puts those sprites on their platforms, as shown in Example 6.20.
+
+
+// Example 6.20 - Put sprites on platforms
+```javascript
+  SnailBait.prototype = {
+    ...
+    putSpriteOnPlatform: function(sprite, platformSprite){
+      sprite.top = platformSprite.top - sprite.height;
+      sprite.left = platformSprite.left;
+
+      sprite.platform = platformSprite;
+    },
+    ...
+  };
+```
+
+The putSpriteOnPlatform() method positions a sprite on top of a platform on the platform's left side. For future use, the method also adds a platform reference to the sprite that points to the platform.
+
+
+### 6.6 - Scroll Sprites
+
+Recall from Chapter 3 that Snail Bait scrolls the background and platforms horizontally by translating the 2D graphics context. Now that platforms are sprites, Snail Bait scrolls the platform sprites and all of the game's other sprites, with the exception of the runner, in the horizontal direction. To implement sprite scrolling, we begin by adding a 'spriteOffset' property to Snail Bait, in addition to the backgroundOffset property, as shown in Example 6.21.
+
+
+// Example 6.21 - Snail Bait's offsets
+```javascript
+  var SnailBait = function(){
+    ...
+    this.STARTING_BACKGROUND_OFFSET = 0;
+    this.STARTING_SPRITE_OFFSET = 0;
+
+    // Translation Offsets...................................
+    this.backgroundOffset = this.STARTING_BACKGROUND_OFFSET;
+    this.spriteOffset = this.STARTING_SPRITE_OFFSET;
+    ...
+  };
+```
+
+Next, we modify Snail Bait's setOffsets() method, first discussed in Section 4.1.2, to set sprite offsets in addition to the offset for the background. The setOffsets() method is listed in Example 6.22.
+
+
+// Example 6.22 - Setting offsets
+```javascript
+  SnailBait.prototype = {
+    ...
+    setOffsets: function(now)}{
+      this.setBackgroundOffset(now);
+      this.setSpriteOffsets(now);
+    }
+    ...
+  };
+```
+
+
+The setOffsets() method sets the background offset, followed by the sprite offset. The setBackgroundOffset() method was discussed in Section 3.6, but because it's a short listing and because it's pertinent to setting sprite offsets, it's listed again here in Example 6.23.
+
+
+// Example 6.23 - Setting the background offset
+```javascript
+  SnailBait.prototype = {
+    ...
+    setBackgroundOffset: function(now){
+      this.backgroundOffset +=
+        this.bgVelocity * (now - this.lastAnimationFrameTime) / 1000;
+
+      if(this.backgroundOffset < 0 || this.backgroundOffset > this.BACKGROUND_WIDTH){
+        this.backgroundOffset = 0;
+      }
+    },
+    ...
+  };
+```
+
+The setSpriteOffsets() method is listed in Example 6.24.
+
+
+// Example 6.24 - Setting sprite offsets
+```javascript
+  SnailBait.prototype = {
+    ...
+    setSpriteOffsets: function(now){      // In step with platforms
+      var sprite;
+
+      this.spriteOffset +=
+        this.platformVelocity * (now - lastAnimationFrameTime) / 1000;
+
+      for(var i=0; i < this.sprites.length; i++){
+        sprite = this.sprites[i];
+
+        if('runner' !== sprite.type){
+          sprite.hOffset = this.spriteOffset;
+        }
+      }
+    },
+    ...
+  };
+```
+
+Both setBackgroundOffset() and setSpriteOffsets() increment their respective offset properties by using time-based motion, as discussed in Section 3.6. The setSpriteOffsets() method iterates over all of the game's sprites, setting each sprite's 'hOffset' property to the current sprite offset. Ultimately, Snail Bait uses those offsets when drawing sprites, as discussed in Section 6.2, 'Incorporate Sprites into a Game Loop'.
+
+
+### 6.7 - Conclusion
+
+Animated characters known as sprites are fundamental to all video games, and in this chapter you saw one way to implement them. The sprite implementation in this chapter separates drawing sprites and sprite behaviors from the actual sprites themselves, resulting in more flexibility than if sprites drew themselves and implemented their own behaviors.
+
+Reducing the number of HTTP requests you make to load your game's resources will increase the speed with which your game initially loads, so it's a good idea to put all your images into one large image known as a sprite sheet. Fortunately, the 2D graphics context makes it easy to copy rectangles from a sprite sheet into the context's associated canvas, which is how we implemented sprite sheet artists in this chapter. Recall, however, that you may have to resort to multiple sprite sheets on mobile devices because of image file size limitations. Besides decoupling sprites from the objects that draw them and endowing them with behaviors, the sprites implemented in this chapter are also decoupled from the data that defines them. Defining sprite data outside the methods that create sprites results in simpler sprite creation methods and more flexibility because you can change the source of the metadata without changing sprite creation methods.
+
+Finally, in this chapter, you saw how to scroll sprites horizontally in the same manner that Snail Bait scrolls the background.
+
+
+### 6.8 - Exercises
+
+1. Change Snail Bait's sprite metadata to move sprites to different initial locations.
+2. Add another sprite of your choosing to the game. Here's what you need to do:
+  a) Find images for your sprite and add them to Snail Bait's sprite sheet.
+  b) Calculate the bounding boxes for each image and add that data to your sprite's metadata.
+  c) Instantiate the sprite and add it to the game.
+3. Add a 'zIndex' property to the 'Sprite' object and modify the Sprite.draw() method to draw sprites with higher z-indexes on top of sprites with lower z-indexes.

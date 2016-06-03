@@ -1,0 +1,136 @@
+# Core HTML5 2D Game Programming
+*By David Geary*
+
+Retyped by jm8.
+*jm8 - Note by jm8*
+
+
+## Preface
+
+This book is for experienced JavaScript (JS) developers who want to implement 2D games with HTML5. In this book, I chronicle the development o f a sophisticated side-scroller platform video game, named Snail Bat, from scratch. I do not use any third-party graphics or game frameworks, so that you can learn to implement everythingn from smooth animatios and exploding sprites to developer backdoors and in-game metrics, entirely on your own. If you do use a game framework, this book provides valuable insights into how they work.
+
+Because it's meant for instructional purposes, Snail Bait has only a single level, but in all other respects it's a full-fledged, arcade-style game. Snail Bait simultaneously manipulates dozens of animated objects, known as *sprites*, on top of a scrolling background and simultaneously plays multiple sound effects layered over the game's soundtrack. The sprities run, jump, fly, sparkle, bounce, pace, explode, collide, shoot, land on platforms, and fall through the bottom of the game.
+
+Snail Bait also implements many other features, such as a time system that can slow the game's overall time or speed it up; an animated loading screen; special effects, such as shaking the game when the main character loses a life; and particle systems that simulate smoke and fire. Snail Bait pauses the game when the game's window loses focus; and when the window regains focus, Snail Bait resumes with an animateed countdown to give the user time to regain the controls.
+Although it doesn't use game or graphics frameworks, Snail Bait uses Node.js and socket.io to send in-game metrics to a server, and to store and retrieve high scores, which the game displays with a heads-up display. Snail Bait shows a warning when the game runs too slowly, and if you type CTRL-d as the game runs, Snail Bait reveals a developer backdoor that gives you special powers, such as modifying the flow of time or displaying sprite collision rectangles, among other things.
+
+Snail Bait detects when it runs on a mobile device and reconfigures itself by installing touch event handlers and resizing the game to fit snguly on the mobile device's screen.
+
+In this book I show you how to implement all of Snail Bait's features tep by step, so that you can implement similar features in your own games.
+
+
+### A Brief History of This Book
+
+In 2010, I downloaded the graphics and sound from a popular open source Android game named *Replica Island*, and used them to implement a primitive version of Snail Bait on Android.
+
+At that time, I became interested in HTML5 Canvas and I started working on my previous book, *Core HTML 5 Canvas*. As I wrote the Canvas book, I continued to work on Snail Bait, converting it from Android's Java to the browser's JavaScript and the HTML5 `canvas` element. By the time that book was finished in 2012, I still had a primitive, but close to feature-complete, version of the game.
+
+Later in 2012, I started writing a 10-article series from IBM developerWorks on game programming, based on Snail Bait. Over the crouse of the next ten months, I continued to work on the game as I wrote the articles. (See the later section "Online Resources" below for a link to those articles.)
+
+By summer 2013, Snail Bait had matured a great deal, so I put together a presentation covering Snail Bait's development and traveled to Sebastopol, California to shoot a 15-hour O'Reilly video titled "HTML5 2D Game Development". In some respects that video is the film version of this book. Although the video wasn't released until Steptember, it was one of the top 10 bestselling O'Reilly videos for 2013. (The "Online Resources" below has a link to that video.)
+
+When I returned home from Sebastopol in July 2013, I started writing this book full time. I started with the ten articles from the IBM developerWorks series, rewrote them as book chapters, and ultimately added ten more chapters. As I was writing, I constantly iterated over Snail Bait's code to make it as readable as possible. 
+
+In December 2013, with Chapters 1-19 written, i decided to add a final chapter on using the techniques in the book to implement a simpler video game. That game is Bodega's Revenge, and it's the subject of Chapter 20.
+
+
+### How to Use This Book
+
+This book's premise is simple: It shows you how to implement a sophisticated video game so that you can implement one of your own.
+
+There are several ways you can use this book. First, I've gone to great lengths to make it as skim-friendly as possible. The book contains lots of screenshots, code listings, and diagrams. 
+
+I make liberal use of Notes, Tips, Cautions, and Best Practices. Encapsulating those topics in callouts streamlines the book's main discussion, and since each Note, Tip, Caution, and Best Practice has a title (excluding callouts with a single line), you can decide at a glance whether those ancillary topics are pertinent to your situation. In general, the book's main discussion shows you how things work, whereas the callouts delve into why things work as they do. If you're in a hurry, you can quickly get to the bottom of how things work by sticking to the main discussion, skimming the callouts to make sure you're not missing anything important. 
+
+Chapters 1-19 of the book chronicle the development of Snail Bait, starting with a version of the game that simply displays graphics and ending with a full-featured HTML5 video game. Chapter 20 is the Epilogue, which uses much of what the book covered in the previous 19 chapters to implement a second video game.
+
+If you plan to read the book, as opposed to using it solely as reference, you will most likely want to start reading at either Chapter 1 or Chapter 20. If you start at the beginning, Chapter 20 will be a recap and review of what you learned previously, in addition to providing new insights such as using polar coordinates and rotating coordinate systems.
+
+If you start reading at Chapter 20, perhaps even just skimming the chapter, you can get an idea for what lies behind in the previous 19 chapters. If you start at Chapter 20, don't expect to understand a lot of what you read in that chapter the first time around.
+
+I assume that many readers will want to use this book as a reference, so I've included references to section headings at the start of each chpater, in addition to a short discussion at the beginning of each chpater about what the chapter entails. That will help you locate topics. I've also included many step-by-step instructions on how to implement features so that you can follow those steps to implement similar features of your own.
+
+
+### The Book's Exercises
+
+Passively reading a book won't turn anyone into a game programmer. You've got to get down in the trenches and sling some code to really learn how to implement games. To that end, each chapter in this book conlcludes with a set of exercises.
+
+To perform the exercises, download the final version of Snail Bait and modify that code. In some cases, the exercises will instruct you how to modify code for a chapter-specific version of the game. See the next section for more information about chapter-specific versions of Snail Bait.
+
+
+### Source Code and Chapter-Specific Versions of Snail Bait
+
+This book comes with the source to two video games. See "Online Resources" later on for URLs to other games and their source code. 
+
+You will undoubtedly find it beneficial to refer to Snail Bait's source code as you read this book. You will find it more beneficial, however, to refer to the version of the game that corresponds to the chapter you are reading. For example, in the first chapter we implement a nascent version of Snail Bait that simply draws the background and the game's main character. That version of the game bears little resemblance to the final version, so referring to the final version of the game is of little use at that point. Instead, you can access the version of Snail Bait corresponding to the end of Chapter 1 and corehtml5games.com/book/code/ch01.
+
+URLs for each of the book's chapter follow the format corehtml5games.com/book/code/ch??, where ?? represents two digits corresponding to chapter numbers from 01 to 20, excluding Chapter 2.
+
+As mentioned above, exercises at the end of each chapter correspond to the final version of Snail Bait, unless otherwise stated.
+
+
+### Prerequisites
+
+No ones would think of taking a creative writing class in a language they couldn't speak or write. Likewise, you must know JS to implement sophisticated games with HTML5. JS is a nonnegotiable prerequisite for this book.
+
+Nearly all of the code listings in this book are JS, but you still need to know your way around HTML and CSS. you should also be familiar with computer graphics and have a good grasp of basic mathematics.
+
+
+### Your Game
+
+Finally, let's talk about why we're here. I assume you're reading this book because you want to implement a game of your own. 
+
+The chapters of this book discuss individual aspects of game programming, such as implementing sprites of detecting collisions. Although they pertain to Snail Bait, you will be able to easily translate those aspects to your own game.
+
+The order of the chapters, however, is also significant because it shows you how to implement a game from start to finish.In the beginning of the book, we gather raw materials, set up our development environment, and then start development by drawing the game's basic graphics. Subsequent chapters add animation, sprites, sprite behavoirs, and so on. If you're starting a game from scratch, you may want to follow that same outline, so you can alternate between reading about features and implementing them on your own.
+
+Before you get started coding in earnest, you should take the time to set up your development environemnt and become as familiar as you can with the browser's developer tools. You should also make sure you shorten your development cycle as discussed at the end of Chapter 2. The time you initially spend preparing will make you more productive later on.
+
+Finally, thank you for buying this book (jm8: lol). I can't wait to see the games you create!
+
+*David Geary*
+*Fort Collins, Colorado*
+*2014*
+
+
+### Online Resources
+
+*Core HTML5 2D Game Programming's* companion website: corehtml5games.com
+
+Play Snail Bait: corehtml5games.com/snailbait
+
+Play Bodega's Revenge: corehtml5games.com/bodegas-revenge
+
+Download Snail Bait: corehtml5games.com/book/downloads/snailbait
+
+Download Bodega's Revenge: corehtml5games.com/book/downloads/bodegas-revenge
+
+David "HTML5 2D Game Development" video from O'Reilly: shop.oreilly.com/product/0636920030737.do.
+
+David's "HTML5 2D Game Development" series on IBM developerWorks: www.ibm.com/developerworks/java/library/j-html5-game1/index.html
+
+A video of David speaking about HTML5 game programming at the Atlanta HTML5 Users Group in 2013: youtube.com/watch?v=S256vAqGY6c
+
+*Core HTML5 Canvas* at http://amzn.to/1jfuf0C. Take a deep dive into Canvas with David's book.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
